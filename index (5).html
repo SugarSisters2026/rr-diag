@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#090c0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RR Diag">
+<title>RR Diagnostics</title>
+<link rel="manifest" href="manifest.json">
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg:     #070a0d;
+  --bg2:    #0b0f14;
+  --panel:  #0f1520;
+  --card:   #111a25;
+  --border: #1c2a3a;
+  --b2:     #243348;
+  --accent: #00d4ff;
+  --a2:     #0099cc;
+  --gold:   #c8a84b;
+  --red:    #ff3c3c;
+  --orange: #ff8c00;
+  --green:  #00e676;
+  --text:   #ccd6e0;
+  --t2:     #7a9ab0;
+  --t3:     #3d5a70;
+  --mono:   'Share Tech Mono', monospace;
+  --head:   'Barlow Condensed', sans-serif;
+  --body:   'Rajdhani', sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+
+html,body{
+  height:100%;width:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  overflow:hidden;
+  touch-action:manipulation;
+}
+
+/* ── SCANLINES ── */
+body::after{
+  content:'';
+  position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,212,255,.008) 3px,rgba(0,212,255,.008) 6px);
+  pointer-events:none;z-index:9999;
+}
+
+/* ── HEADER ── */
+.header{
+  position:fixed;top:0;left:0;right:0;
+  padding:calc(var(--safe-top) + 10px) 16px 10px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;
+}
+.h-left{display:flex;align-items:center;gap:10px;}
+.h-emblem{
+  width:36px;height:36px;
+  border:1.5px solid var(--gold);
+  border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--head);font-size:13px;font-weight:700;
+  color:var(--gold);letter-spacing:1px;
+  background:rgba(200,168,75,.06);
+  flex-shrink:0;
+}
+.h-title{font-family:var(--head);font-size:18px;font-weight:700;letter-spacing:2px;line-height:1;}
+.h-sub{font-family:var(--mono);font-size:9px;color:var(--gold);letter-spacing:1.5px;}
+.h-right{display:flex;align-items:center;gap:8px;}
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 10px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  font-family:var(--mono);font-size:10px;
+  color:var(--t3);
+  cursor:pointer;
+  transition:all .2s;
+}
+.status-pill.connected{border-color:rgba(0,230,118,.4);color:var(--green);}
+.status-pill.connecting{border-color:rgba(255,140,0,.4);color:var(--orange);}
+.status-pill.error{border-color:rgba(255,60,60,.4);color:var(--red);}
+.sdot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.status-pill.connected .sdot,.status-pill.connecting .sdot{animation:blink 1.5s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* ── MAIN SCROLL ── */
+.main{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  padding-top:calc(var(--safe-top) + 56px);
+  padding-bottom:calc(var(--safe-bot) + 60px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  padding-bottom:var(--safe-bot);
+  background:var(--panel);
+  border-top:1px solid var(--border);
+  display:flex;
+  z-index:200;
+}
+.nav-btn{
+  flex:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 4px;
+  font-family:var(--head);font-size:10px;letter-spacing:1px;
+  color:var(--t3);
+  cursor:pointer;
+  transition:all .15s;
+  border:none;background:none;
+  position:relative;
+  gap:3px;
+  min-height:52px;
+}
+.nav-btn.active{color:var(--accent);}
+.nav-btn.active::after{
+  content:'';
+  position:absolute;top:0;left:20%;right:20%;
+  height:2px;background:var(--accent);
+  border-radius:0 0 2px 2px;
+}
+.nav-icon{font-size:20px;line-height:1;}
+.nav-badge{
+  position:absolute;top:6px;right:calc(50% - 18px);
+  background:var(--red);color:#fff;
+  font-family:var(--mono);font-size:8px;
+  padding:1px 4px;border-radius:8px;
+  min-width:14px;text-align:center;
+}
+
+/* ── PANELS ── */
+.panel{display:none;padding:16px;animation:fadeUp .2s ease;}
+.panel.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── CONNECT SCREEN ── */
+.connect-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:60vh;text-align:center;padding:24px;
+  gap:16px;
+}
+.connect-icon{font-size:64px;opacity:.3;}
+.connect-title{font-family:var(--head);font-size:24px;font-weight:700;letter-spacing:2px;color:var(--t2);}
+.connect-sub{font-size:14px;color:var(--t3);line-height:1.7;max-width:300px;}
+
+/* ── BIG CONNECT BUTTON ── */
+.btn-connect{
+  width:100%;max-width:320px;
+  padding:18px;
+  background:var(--accent);
+  color:var(--bg);
+  border:none;border-radius:4px;
+  font-family:var(--head);font-size:18px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+}
+.btn-connect:active{transform:scale(.97);background:var(--a2);}
+
+/* ── BUTTONS ── */
+.btn{
+  font-family:var(--head);font-size:13px;font-weight:600;letter-spacing:1.5px;
+  text-transform:uppercase;padding:10px 16px;
+  border:1.5px solid;border-radius:3px;
+  cursor:pointer;background:transparent;
+  transition:all .15s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:active{transform:scale(.96);}
+.btn-blue{border-color:var(--accent);color:var(--accent);}
+.btn-blue:active{background:rgba(0,212,255,.12);}
+.btn-gold{border-color:var(--gold);color:var(--gold);}
+.btn-gold:active{background:rgba(200,168,75,.12);}
+.btn-red{border-color:var(--red);color:var(--red);}
+.btn-red:active{background:rgba(255,60,60,.12);}
+.btn-green{border-color:var(--green);color:var(--green);}
+.btn-green:active{background:rgba(0,230,118,.12);}
+.btn-sm{font-size:11px;padding:7px 12px;}
+.btn-full{width:100%;justify-content:center;}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* ── CARDS ── */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:14px;
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1.5px;
+  background:linear-gradient(90deg,var(--a2),transparent);opacity:.6;
+}
+.card-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:2px;
+  color:var(--t3);text-transform:uppercase;margin-bottom:10px;
+}
+.section-title{
+  font-family:var(--head);font-size:20px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:14px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:8px;
+}
+.section-title span{color:var(--accent);}
+
+/* ── GAUGE GRID ── */
+.gauge-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+
+.gauge{
+  background:var(--card);border:1px solid var(--border);border-radius:4px;
+  padding:12px;text-align:center;
+  transition:border-color .3s;
+}
+.gauge.warn{border-color:rgba(255,140,0,.5);}
+.gauge.crit{border-color:rgba(255,60,60,.5);animation:gcrit .8s infinite;}
+@keyframes gcrit{0%,100%{background:var(--card);}50%{background:rgba(255,60,60,.05);}}
+
+.g-label{font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--t3);margin-bottom:6px;}
+.g-val{font-family:var(--mono);font-size:28px;color:var(--accent);line-height:1;transition:color .3s;}
+.gauge.warn .g-val{color:var(--orange);}
+.gauge.crit .g-val{color:var(--red);}
+.g-unit{font-family:var(--head);font-size:10px;color:var(--t3);letter-spacing:1.5px;margin-top:3px;}
+.g-bar{height:3px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;}
+.g-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease;}
+.gauge.warn .g-fill{background:var(--orange);}
+.gauge.crit .g-fill{background:var(--red);}
+
+/* ── DTC ITEMS ── */
+.dtc{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:4px;padding:14px;margin-bottom:10px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.dtc-top{display:flex;align-items:center;gap:10px;}
+.dtc-code{
+  font-family:var(--mono);font-size:15px;font-weight:bold;
+  color:var(--orange);min-width:58px;
+}
+.dtc-name{font-family:var(--head);font-size:15px;font-weight:600;flex:1;line-height:1.3;}
+.dtc-sub{font-family:var(--mono);font-size:10px;color:var(--t2);margin-left:68px;}
+.dtc-actions{display:flex;gap:8px;padding-left:68px;}
+.sev{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:3px 7px;border-radius:2px;}
+.sev-h{background:rgba(255,60,60,.15);color:var(--red);border:1px solid rgba(255,60,60,.3);}
+.sev-m{background:rgba(255,140,0,.15);color:var(--orange);border:1px solid rgba(255,140,0,.3);}
+.sev-l{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.2);}
+
+/* ── INFO ROWS ── */
+.info-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:3px;margin-bottom:6px;
+}
+.info-key{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:1px;}
+.info-val{font-family:var(--mono);font-size:12px;color:var(--text);}
+
+/* ── TAG ── */
+.tag{display:inline-block;padding:2px 7px;border-radius:2px;font-family:var(--mono);font-size:9px;letter-spacing:1px;}
+.tag-blue{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.2);}
+.tag-gold{background:rgba(200,168,75,.1);color:var(--gold);border:1px solid rgba(200,168,75,.2);}
+.tag-red{background:rgba(255,60,60,.1);color:var(--red);border:1px solid rgba(255,60,60,.2);}
+.tag-green{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.2);}
+
+/* ── WARNING BANNER ── */
+.warn-box{
+  background:rgba(255,140,0,.07);border:1px solid rgba(255,140,0,.3);
+  border-radius:3px;padding:12px;margin-bottom:14px;
+  font-size:13px;color:var(--t2);line-height:1.6;
+  display:flex;gap:8px;
+}
+.warn-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+
+/* ── SENSOR TABLE ── */
+.sensor-item{
+  display:flex;align-items:center;
+  padding:11px 12px;border-bottom:1px solid var(--border);
+  gap:10px;
+}
+.sensor-item:last-child{border-bottom:none;}
+.s-name{flex:1;font-family:var(--head);font-size:13px;font-weight:500;color:var(--t2);}
+.s-val{font-family:var(--mono);font-size:14px;color:var(--accent);min-width:70px;text-align:right;}
+.s-unit{font-family:var(--mono);font-size:10px;color:var(--t3);min-width:30px;}
+
+/* ── CAL STEPS ── */
+.cal-step{
+  display:flex;gap:12px;padding:12px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:3px;margin-bottom:8px;
+  transition:all .3s;
+}
+.cal-step.active{border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.04);}
+.cal-step.done{border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.03);}
+.cal-num{
+  width:26px;height:26px;border-radius:50%;
+  border:1.5px solid var(--t3);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;color:var(--t3);
+  flex-shrink:0;transition:all .3s;
+}
+.cal-step.active .cal-num{border-color:var(--accent);color:var(--accent);animation:blink 1.5s infinite;}
+.cal-step.done .cal-num{border-color:var(--green);color:var(--green);}
+.cal-body strong{font-family:var(--head);font-size:14px;font-weight:600;display:block;margin-bottom:3px;}
+.cal-body p{font-size:12px;color:var(--t2);line-height:1.5;}
+
+/* ── TERMINAL ── */
+.terminal{
+  background:#020508;border:1px solid var(--border);border-radius:3px;
+  padding:12px;font-family:var(--mono);font-size:12px;
+  height:200px;overflow-y:auto;line-height:1.8;
+}
+.tl{color:var(--t2);}
+.tl.cmd{color:var(--accent);}
+.tl.resp{color:var(--green);}
+.tl.err{color:var(--red);}
+.tl.info{color:var(--gold);}
+.term-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
+.term-row span{color:var(--accent);font-family:var(--mono);font-size:13px;white-space:nowrap;}
+.term-input{
+  flex:1;background:transparent;border:none;outline:none;
+  color:var(--text);font-family:var(--mono);font-size:13px;
+  min-width:0;
+}
+
+/* ── SETUP STEPS ── */
+.setup-step{
+  background:var(--card);border:1px solid var(--border);border-radius:4px;
+  padding:14px;margin-bottom:10px;
+}
+.setup-num{
+  display:inline-block;
+  font-family:var(--head);font-size:11px;letter-spacing:2px;
+  color:var(--accent);margin-bottom:6px;
+}
+.setup-step h3{font-family:var(--head);font-size:16px;font-weight:600;letter-spacing:.5px;margin-bottom:6px;}
+.setup-step p{font-size:13px;color:var(--t2);line-height:1.6;}
+.setup-step .code{
+  font-family:var(--mono);font-size:11px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:2px;padding:8px 10px;margin-top:8px;
+  color:var(--green);line-height:1.7;
+}
+
+/* ── HEIGHT CONTROL ── */
+.height-btn{
+  padding:14px;border:1.5px solid var(--border);
+  background:var(--card);border-radius:4px;
+  text-align:center;cursor:pointer;transition:all .2s;
+}
+.height-btn:active{transform:scale(.95);}
+.height-btn .hb-icon{font-size:24px;margin-bottom:6px;}
+.height-btn .hb-label{font-family:var(--head);font-size:13px;letter-spacing:1px;color:var(--t2);}
+.height-btn.selected{border-color:var(--accent);background:rgba(0,212,255,.07);}
+.height-btn.selected .hb-label{color:var(--accent);}
+
+/* ── SAS DIAL ── */
+.sas-display{
+  text-align:center;padding:20px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:4px;margin-bottom:12px;
+}
+.sas-big{font-family:var(--mono);font-size:52px;color:var(--accent);line-height:1;}
+.sas-unit{font-family:var(--head);font-size:12px;color:var(--t3);letter-spacing:3px;margin-top:4px;}
+.sas-bar-wrap{
+  height:8px;background:var(--border);border-radius:4px;
+  margin:10px auto;max-width:200px;position:relative;overflow:hidden;
+}
+.sas-bar-fill{
+  position:absolute;top:0;bottom:0;
+  background:var(--accent);transition:all .4s;
+}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.mb8{margin-bottom:8px;}
+.mb12{margin-bottom:12px;}
+.mb16{margin-bottom:16px;}
+.mt12{margin-top:12px;}
+.mt16{margin-top:16px;}
+
+/* ── BT METHODS ── */
+.bt-method{
+  background:var(--card);border:1.5px solid var(--border);
+  border-radius:4px;padding:14px;margin-bottom:10px;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:flex-start;gap:12px;
+}
+.bt-method.selected{border-color:var(--accent);background:rgba(0,212,255,.05);}
+.bt-method:active{transform:scale(.98);}
+.bt-m-icon{font-size:28px;flex-shrink:0;}
+.bt-m-title{font-family:var(--head);font-size:15px;font-weight:600;letter-spacing:.5px;margin-bottom:4px;}
+.bt-m-sub{font-size:12px;color:var(--t2);line-height:1.5;}
+.bt-m-tag{margin-top:6px;}
+
+select,input[type=text],input[type=number]{
+  background:var(--card);border:1px solid var(--b2);
+  color:var(--text);font-family:var(--mono);font-size:13px;
+  padding:10px 12px;border-radius:3px;outline:none;
+  width:100%;transition:border-color .2s;
+  -webkit-appearance:none;
+}
+select:focus,input:focus{border-color:var(--accent);}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="h-left">
+    <div class="h-emblem">LR</div>
+    <div>
+      <div class="h-title">RR Diag</div>
+      <div class="h-sub">L322 · 4.4 V8</div>
+    </div>
+  </div>
+  <div class="h-right">
+    <div class="status-pill" id="statusPill" onclick="openConnectSheet()">
+      <div class="sdot"></div>
+      <span id="statusText">OFFLINE</span>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN CONTENT -->
+<div class="main" id="mainScroll">
+
+  <!-- ── DASHBOARD ── -->
+  <div class="panel active" id="panel-dash">
+    <div class="section-title">
+      <span>Dashboard <span>Live</span></span>
+      <button class="btn btn-sm btn-blue" id="liveBtn" onclick="toggleLive()">▶ START</button>
+    </div>
+
+    <div id="notConnBanner" class="warn-box mb12">
+      <span class="warn-icon">📡</span>
+      <div>Tap <strong>OFFLINE</strong> above to connect your ELM327 Bluetooth adapter.</div>
+    </div>
+
+    <div class="gauge-grid" id="gaugeGrid">
+      <div class="gauge" id="g-rpm">
+        <div class="g-label">ENGINE RPM</div>
+        <div class="g-val" id="v-rpm">—</div>
+        <div class="g-unit">RPM</div>
+        <div class="g-bar"><div class="g-fill" id="b-rpm" style="width:0"></div></div>
+      </div>
+      <div class="gauge" id="g-speed">
+        <div class="g-label">SPEED</div>
+        <div class="g-val" id="v-speed">—</div>
+        <div class="g-unit">KM/H</div>
+        <div class="g-bar"><div class="g-fill" id="b-speed" style="width:0"></div></div>
+      </div>
+      <div class="gauge" id="g-coolant">
+        <div class="g-label">COOLANT</div>
+        <div class="g-val" id="v-coolant">—</div>
+        <div class="g-unit">°C</div>
+        <div class="g-bar"><div class="g-fill" id="b-coolant" style="width:0"></div></div>
+      </div>
+      <div class="gauge" id="g-throttle">
+        <div class="g-label">THROTTLE</div>
+        <div class="g-val" id="v-throttle">—</div>
+        <div class="g-unit">%</div>
+        <div class="g-bar"><div class="g-fill" id="b-throttle" style="width:0"></div></div>
+      </div>
+      <div class="gauge" id="g-maf">
+        <div class="g-label">MAF</div>
+        <div class="g-val" id="v-maf">—</div>
+        <div class="g-unit">G/S</div>
+        <div class="g-bar"><div class="g-fill" id="b-maf" style="width:0"></div></div>
+      </div>
+      <div class="gauge" id="g-fuel">
+        <div class="g-label">FUEL TRIM</div>
+        <div class="g-val" id="v-fuel">—</div>
+        <div class="g-unit">%</div>
+        <div class="g-bar"><div class="g-fill" id="b-fuel" style="width:50%"></div></div>
+      </div>
+      <div class="gauge" id="g-baro">
+        <div class="g-label">BARO</div>
+        <div class="g-val" id="v-baro">—</div>
+        <div class="g-unit">KPA</div>
+        <div class="g-bar"><div class="g-fill" id="b-baro" style="width:70%"></div></div>
+      </div>
+      <div class="gauge" id="g-o2">
+        <div class="g-label">O2 B1S1</div>
+        <div class="g-val" id="v-o2">—</div>
+        <div class="g-unit">V</div>
+        <div class="g-bar"><div class="g-fill" id="b-o2" style="width:0"></div></div>
+      </div>
+    </div>
+
+    <div class="card mb12">
+      <div class="card-label">ECU SNAPSHOT</div>
+      <div class="info-row"><span class="info-key">VIN</span><span class="info-val" id="d-vin">—</span></div>
+      <div class="info-row"><span class="info-key">PROTOCOL</span><span class="info-val" id="d-prot">—</span></div>
+      <div class="info-row"><span class="info-key">BATTERY</span><span class="info-val" id="d-volt">—</span></div>
+      <div class="info-row"><span class="info-key">RUN TIME</span><span class="info-val" id="d-run">—</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">READINESS</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="readiness-tags">
+        <span class="tag tag-green">CATALYST ✓</span>
+        <span class="tag" style="background:rgba(255,140,0,.12);color:var(--orange);border-color:rgba(255,140,0,.3)">O2 INCOMPLETE</span>
+        <span class="tag tag-green">EVAP ✓</span>
+        <span class="tag tag-green">EGR ✓</span>
+        <span class="tag tag-green">MISFIRE ✓</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FAULT CODES ── -->
+  <div class="panel" id="panel-dtc">
+    <div class="section-title">
+      Fault <span>Codes</span>
+      <div class="btn-row">
+        <button class="btn btn-sm btn-blue" onclick="readDTCs()">🔍 Read</button>
+        <button class="btn btn-sm btn-red" onclick="clearDTCs()">🗑 Clear</button>
+      </div>
+    </div>
+
+    <div id="dtc-container">
+      <div class="dtc">
+        <div class="dtc-top">
+          <div class="dtc-code">P0300</div>
+          <div class="dtc-name">Random / Multiple Misfire</div>
+          <div class="sev sev-h">HIGH</div>
+        </div>
+        <div class="dtc-sub">ECM · 4.4L V8 · Both Banks</div>
+        <div class="dtc-actions">
+          <button class="btn btn-sm btn-blue" onclick="dtcDetail('P0300','Random misfire can indicate failing coils, spark plugs, or injectors on the 4.4 V8. Check cylinder-specific misfire counts.')">ℹ Info</button>
+        </div>
+      </div>
+      <div class="dtc">
+        <div class="dtc-top">
+          <div class="dtc-code">C1A35</div>
+          <div class="dtc-name">Steering Angle — Calibrate</div>
+          <div class="sev sev-m">MED</div>
+        </div>
+        <div class="dtc-sub">ABS/DSC Module · Post battery disconnect</div>
+        <div class="dtc-actions">
+          <button class="btn btn-sm btn-gold" onclick="goPanel('panel-steer')">Calibrate →</button>
+        </div>
+      </div>
+      <div class="dtc">
+        <div class="dtc-top">
+          <div class="dtc-code">B1A22</div>
+          <div class="dtc-name">EAS Compressor Signal</div>
+          <div class="sev sev-m">MED</div>
+        </div>
+        <div class="dtc-sub">Body Module · Relay circuit intermittent</div>
+        <div class="dtc-actions">
+          <button class="btn btn-sm btn-blue" onclick="dtcDetail('B1A22','Check the EAS compressor relay under the bonnet fuse box. Common fault on L322 — relay socket pins corrode. Also check 30A fuse.')">ℹ Info</button>
+          <button class="btn btn-sm btn-gold" onclick="goPanel('panel-susp')">EAS →</button>
+        </div>
+      </div>
+      <div style="padding:10px 4px;font-family:var(--mono);font-size:10px;color:var(--t3);">
+        Last scan: <span id="scan-time">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CALIBRATION ── -->
+  <div class="panel" id="panel-cal">
+    <div class="section-title">Calibration <span>Tools</span></div>
+
+    <!-- Steering Angle Sensor shortcut -->
+    <div class="card mb8" onclick="goPanel('panel-steer')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">🔄</span>
+      <div style="flex:1;">
+        <div style="font-family:var(--head);font-size:16px;font-weight:600;letter-spacing:.5px;">Steering Angle Sensor</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:3px;">Reset &amp; calibrate SAS in DSC module</div>
+      </div>
+      <span class="tag tag-red">DTC</span>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+
+    <!-- Suspension -->
+    <div class="card mb8" onclick="goPanel('panel-susp')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">↕️</span>
+      <div style="flex:1;">
+        <div style="font-family:var(--head);font-size:16px;font-weight:600;letter-spacing:.5px;">Air Suspension (EAS)</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:3px;">Height control &amp; sensor reset</div>
+      </div>
+      <span class="tag tag-red">DTC</span>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+
+    <!-- Throttle -->
+    <div class="card mb8" onclick="goPanel('panel-throttle')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">⚙️</span>
+      <div style="flex:1;">
+        <div style="font-family:var(--head);font-size:16px;font-weight:600;letter-spacing:.5px;">Throttle Body Reset</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:3px;">Clear ETC adaptation values</div>
+      </div>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+
+    <!-- Battery -->
+    <div class="card mb8" onclick="goPanel('panel-battery')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">🔋</span>
+      <div style="flex:1;">
+        <div style="font-family:var(--head);font-size:16px;font-weight:600;letter-spacing:.5px;">Battery Registration</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:3px;">Register new battery in IBS module</div>
+      </div>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+
+    <!-- Terminal -->
+    <div class="card" onclick="goPanel('panel-terminal')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">💻</span>
+      <div style="flex:1;">
+        <div style="font-family:var(--head);font-size:16px;font-weight:600;letter-spacing:.5px;">OBD-II Terminal</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:3px;">Raw AT command console</div>
+      </div>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+  </div>
+
+  <!-- ── STEERING ANGLE ── -->
+  <div class="panel" id="panel-steer">
+    <div class="section-title">
+      <span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;margin-right:4px;cursor:pointer;">‹</button>Steering <span>Angle</span></span>
+      <span class="tag tag-gold">SAS · DSC</span>
+    </div>
+
+    <div class="warn-box mb12">
+      <span class="warn-icon">⚠️</span>
+      <div>Park on level ground. Wheels pointing straight. Ignition ON, engine OFF. Vehicle must be <strong>stationary</strong>.</div>
+    </div>
+
+    <div class="sas-display mb12">
+      <div class="sas-big" id="sas-val">—</div>
+      <div class="sas-unit">DEGREES FROM CENTRE</div>
+      <div class="sas-bar-wrap">
+        <div class="sas-bar-fill" id="sas-bar" style="left:50%;width:0;transform:none;"></div>
+      </div>
+    </div>
+
+    <div class="g2 mb12">
+      <div class="info-row"><span class="info-key">STATUS</span><span class="info-val" id="sas-status">—</span></div>
+      <div class="info-row"><span class="info-key">DSC</span><span class="info-val" id="dsc-stat">—</span></div>
+      <div class="info-row"><span class="info-key">YAW RATE</span><span class="info-val" id="yaw">—</span></div>
+      <div class="info-row"><span class="info-key">LATERAL G</span><span class="info-val" id="latg">—</span></div>
+    </div>
+
+    <div id="calSteps" class="mb16">
+      <div class="cal-step done" id="cs1"><div class="cal-num">✓</div><div class="cal-body"><strong>Pre-check</strong><p>Vehicle stationary, level ground, ignition ON.</p></div></div>
+      <div class="cal-step active" id="cs2"><div class="cal-num">2</div><div class="cal-body"><strong>Centre Steering</strong><p>Wheels straight ahead. SAS should read 0° ±2°.</p></div></div>
+      <div class="cal-step" id="cs3"><div class="cal-num">3</div><div class="cal-body"><strong>Send Reset Command</strong><p>OBD-II Mode 31, SID 0x3D22 → DSC module.</p></div></div>
+      <div class="cal-step" id="cs4"><div class="cal-num">4</div><div class="cal-body"><strong>Lock-to-Lock</strong><p>Full left → Full right → Return to centre.</p></div></div>
+      <div class="cal-step" id="cs5"><div class="cal-num">5</div><div class="cal-body"><strong>Confirm &amp; Store</strong><p>Clear DTC C1A35 and confirm calibration stored.</p></div></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-blue btn-full" onclick="runSASCal()">▶ Run Full Calibration</button>
+    </div>
+    <div class="btn-row mt12">
+      <button class="btn btn-red btn-sm" onclick="resetSAS()">Reset SAS Only</button>
+      <button class="btn btn-sm btn-gold" onclick="clearSASDTC()">Clear C1A35</button>
+    </div>
+  </div>
+
+  <!-- ── SUSPENSION ── -->
+  <div class="panel" id="panel-susp">
+    <div class="section-title">
+      <span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;margin-right:4px;cursor:pointer;">‹</button>Air <span>Suspension</span></span>
+    </div>
+    <div class="warn-box mb12">
+      <span class="warn-icon">⚠️</span>
+      <div>Never go under the vehicle during height changes. EAS operates at high pressure.</div>
+    </div>
+
+    <div class="card mb12">
+      <div class="card-label">CORNER HEIGHT SENSORS (mm)</div>
+      <div class="g2" style="gap:8px;">
+        <div class="info-row"><span class="info-key">FL</span><span class="info-val" id="hs-fl">—</span></div>
+        <div class="info-row"><span class="info-key">FR</span><span class="info-val" id="hs-fr">—</span></div>
+        <div class="info-row"><span class="info-key">RL</span><span class="info-val" id="hs-rl">—</span></div>
+        <div class="info-row"><span class="info-key">RR</span><span class="info-val" id="hs-rr">—</span></div>
+      </div>
+      <div class="info-row mt12"><span class="info-key">COMPRESSOR</span><span class="info-val" id="comp">—</span></div>
+      <div class="info-row"><span class="info-key">SYSTEM PRESSURE</span><span class="info-val" id="comp-p">—</span></div>
+    </div>
+
+    <div class="card-label" style="padding:0 0 8px;">HEIGHT MODE</div>
+    <div class="g2 mb12">
+      <div class="height-btn" id="hb-ext" onclick="setHeight('ext')">
+        <div class="hb-icon">🔼</div>
+        <div class="hb-label">EXTENDED</div>
+      </div>
+      <div class="height-btn selected" id="hb-norm" onclick="setHeight('norm')">
+        <div class="hb-icon">➡️</div>
+        <div class="hb-label">NORMAL</div>
+      </div>
+      <div class="height-btn" id="hb-low" onclick="setHeight('low')">
+        <div class="hb-icon">🔽</div>
+        <div class="hb-label">ACCESS LOW</div>
+      </div>
+      <div class="height-btn" id="hb-crawl" onclick="setHeight('crawl')">
+        <div class="hb-icon">🪨</div>
+        <div class="hb-label">CRAWL</div>
+      </div>
+    </div>
+    <button class="btn btn-red btn-full btn-sm" onclick="resetEAS()">Reset EAS Module</button>
+  </div>
+
+  <!-- ── THROTTLE ── -->
+  <div class="panel" id="panel-throttle">
+    <div class="section-title">
+      <span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;margin-right:4px;cursor:pointer;">‹</button>Throttle <span>Reset</span></span>
+    </div>
+    <div class="warn-box mb12">
+      <span class="warn-icon">ℹ️</span>
+      Perform after throttle body cleaning or replacement. Engine must be at operating temperature (≥80°C).
+    </div>
+    <div class="card mb12">
+      <div class="card-label">LIVE THROTTLE DATA</div>
+      <div class="info-row"><span class="info-key">ACTUAL POS</span><span class="info-val" id="thr-act">—</span></div>
+      <div class="info-row"><span class="info-key">DEMAND POS</span><span class="info-val" id="thr-dem">—</span></div>
+      <div class="info-row"><span class="info-key">TARGET IDLE</span><span class="info-val" id="idle-t">730 RPM</span></div>
+      <div class="info-row"><span class="info-key">ACTUAL IDLE</span><span class="info-val" id="idle-a">—</span></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-label">PROCEDURE</div>
+      <div style="font-size:13px;color:var(--t2);line-height:2.1;">
+        <p>1. Engine at operating temp (coolant ≥80°C)</p>
+        <p>2. All electrical loads OFF (A/C, headlights)</p>
+        <p>3. Tap Reset — sends Mode 31 ETC command</p>
+        <p>4. Ignition OFF, wait 30 seconds</p>
+        <p>5. Start engine, idle 10 min without loads</p>
+      </div>
+    </div>
+    <button class="btn btn-blue btn-full" onclick="resetThrottle()">⚡ Reset ETC Adaptation</button>
+  </div>
+
+  <!-- ── BATTERY ── -->
+  <div class="panel" id="panel-battery">
+    <div class="section-title">
+      <span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;margin-right:4px;cursor:pointer;">‹</button>Battery <span>Reg.</span></span>
+    </div>
+    <div class="warn-box mb12">
+      <span class="warn-icon">ℹ️</span>
+      Register new battery after replacement. Failure causes wrong charging strategy and early drain. L322 uses an Intelligent Battery Sensor (IBS).
+    </div>
+    <div class="card mb12">
+      <div class="card-label">IBS READINGS</div>
+      <div class="info-row"><span class="info-key">VOLTAGE</span><span class="info-val" id="bat-v">—</span></div>
+      <div class="info-row"><span class="info-key">CURRENT</span><span class="info-val" id="bat-c">—</span></div>
+      <div class="info-row"><span class="info-key">STATE OF CHARGE</span><span class="info-val" id="bat-soc">—</span></div>
+      <div class="info-row"><span class="info-key">STATE OF HEALTH</span><span class="info-val" id="bat-soh">—</span></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-label">NEW BATTERY DETAILS</div>
+      <div class="mb8"><div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:6px;letter-spacing:1px;">CAPACITY (AH)</div>
+      <input type="number" id="bat-ah" value="110" min="60" max="200"></div>
+      <div><div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:6px;letter-spacing:1px;">TYPE</div>
+      <select id="bat-type">
+        <option>Standard Lead-Acid (FLA)</option>
+        <option selected>AGM (Absorbent Glass Mat)</option>
+        <option>EFB (Enhanced Flooded)</option>
+      </select></div>
+    </div>
+    <button class="btn btn-gold btn-full" onclick="registerBattery()">Register Battery in IBS</button>
+  </div>
+
+  <!-- ── TERMINAL ── -->
+  <div class="panel" id="panel-terminal">
+    <div class="section-title">
+      <span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;margin-right:4px;cursor:pointer;">‹</button>OBD-II <span>Terminal</span></span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+      <button class="btn btn-sm btn-gold" onclick="tp('ATZ')">ATZ</button>
+      <button class="btn btn-sm btn-blue" onclick="tp('ATSP0')">AutoProto</button>
+      <button class="btn btn-sm btn-blue" onclick="tp('0902')">Get VIN</button>
+      <button class="btn btn-sm btn-blue" onclick="tp('03')">Read DTCs</button>
+      <button class="btn btn-sm btn-red" onclick="tp('04')">Clear DTCs</button>
+      <button class="btn btn-sm btn-blue" onclick="tp('010C')">RPM</button>
+      <button class="btn btn-sm btn-blue" onclick="tp('0105')">Coolant</button>
+    </div>
+    <div class="terminal" id="termOut">
+      <div class="tl info">RR Diagnostics — OBD-II Terminal</div>
+      <div class="tl info">2006 Range Rover L322 · ELM327</div>
+      <div class="tl">──────────────────────────</div>
+      <div class="tl" style="color:var(--t3)">Awaiting connection...</div>
+    </div>
+    <div class="term-row">
+      <span>&gt;_</span>
+      <input class="term-input" id="termIn" placeholder="AT command or OBD PID..." onkeydown="if(event.key==='Enter')sendTerm()">
+      <button class="btn btn-sm btn-blue" onclick="sendTerm()">Send</button>
+    </div>
+  </div>
+
+  <!-- ── SETUP / SETTINGS ── -->
+  <div class="panel" id="panel-setup">
+    <div class="section-title">Connect <span>Setup</span></div>
+
+    <div class="setup-step">
+      <div class="setup-num">STEP 01 — ADAPTER</div>
+      <h3>Get a BLE OBD-II Adapter</h3>
+      <p>For Android Chrome, you need a <strong>Bluetooth LE (BLE / Bluetooth 4.0+)</strong> ELM327 adapter. Standard Bluetooth Classic adapters won't work in the browser.</p>
+      <div class="code">✓ Viecar EA400 BLE<br>✓ OBDLink CX (BLE)<br>✓ Veepeak OBDCheck BLE<br>✗ Generic Bluetooth Classic ELM327 (won't work in browser)<br>✗ WiFi adapters (different method)</div>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-num">STEP 02 — BROWSER</div>
+      <h3>Use Chrome on Android</h3>
+      <p>Web Bluetooth is supported in <strong>Chrome for Android</strong>. Enable the flag if prompted:</p>
+      <div class="code">chrome://flags/#enable-web-bluetooth<br>→ Set to Enabled</div>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-num">STEP 03 — INSTALL AS APP</div>
+      <h3>Add to Home Screen (PWA)</h3>
+      <p>In Chrome, tap the <strong>⋮ menu → Add to Home screen</strong>. The app will open fullscreen like a native app — no browser bars.</p>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-num">STEP 04 — CONNECT</div>
+      <h3>Pair Your Adapter</h3>
+      <p>Plug your OBD-II adapter into the diagnostic port (under dashboard, driver's side). Then tap the button below — your phone will scan for BLE devices.</p>
+    </div>
+
+    <button class="btn-connect mt16" onclick="openConnectSheet()">
+      <span>📡</span> Connect to OBD-II
+    </button>
+
+    <div class="setup-step" style="margin-top:16px;">
+      <div class="setup-num">ALTERNATIVE — LAPTOP BRIDGE</div>
+      <h3>Bluetooth Classic via Python</h3>
+      <p>If you have a standard Bluetooth Classic ELM327 dongle, run the companion script on a laptop connected to the same WiFi, then enter the IP below.</p>
+      <div style="margin-top:10px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:6px;letter-spacing:1px;">BRIDGE IP:PORT</div>
+        <input type="text" id="bridgeUrl" value="ws://192.168.1.100:8765" placeholder="ws://192.168.x.x:8765">
+      </div>
+      <div class="btn-row mt12">
+        <button class="btn btn-sm btn-gold" onclick="connectWS()">Connect via Bridge</button>
+        <button class="btn btn-sm btn-blue" onclick="downloadBridge()">⬇ Download Script</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nb-dash" onclick="switchTab('dash')">
+    <span class="nav-icon">📊</span>
+    <span>LIVE</span>
+  </button>
+  <button class="nav-btn" id="nb-dtc" onclick="switchTab('dtc')">
+    <span class="nav-icon">⚠️</span>
+    <span>FAULTS</span>
+    <span class="nav-badge">3</span>
+  </button>
+  <button class="nav-btn" id="nb-cal" onclick="switchTab('cal')">
+    <span class="nav-icon">🔧</span>
+    <span>CAL</span>
+  </button>
+  <button class="nav-btn" id="nb-setup" onclick="switchTab('setup')">
+    <span class="nav-icon">⚙️</span>
+    <span>SETUP</span>
+  </button>
+</nav>
+
+<!-- CONNECT SHEET (bottom drawer) -->
+<div id="sheet-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;" onclick="closeSheet()"></div>
+<div id="connect-sheet" style="
+  position:fixed;bottom:-100%;left:0;right:0;
+  background:var(--panel);border-top:1px solid var(--border);
+  border-radius:16px 16px 0 0;
+  z-index:600;padding:20px 20px calc(var(--safe-bot) + 20px);
+  transition:bottom .3s ease;max-height:80vh;overflow-y:auto;
+">
+  <div style="width:40px;height:4px;background:var(--b2);border-radius:2px;margin:0 auto 20px;"></div>
+  <div style="font-family:var(--head);font-size:20px;font-weight:700;letter-spacing:2px;margin-bottom:16px;">Connect OBD-II Adapter</div>
+
+  <div class="bt-method selected" id="bm-ble" onclick="selectMethod('ble')">
+    <span class="bt-m-icon">📶</span>
+    <div>
+      <div class="bt-m-title">Bluetooth LE (BLE)</div>
+      <div class="bt-m-sub">Best for Android. Requires BLE ELM327 adapter (OBDLink CX, Viecar EA400, Veepeak BLE).</div>
+      <div class="bt-m-tag"><span class="tag tag-green">RECOMMENDED</span></div>
+    </div>
+  </div>
+
+  <div class="bt-method" id="bm-ws" onclick="selectMethod('ws')">
+    <span class="bt-m-icon">🌐</span>
+    <div>
+      <div class="bt-m-title">WiFi / WebSocket Bridge</div>
+      <div class="bt-m-sub">Use with any Bluetooth Classic ELM327. Run rr_bridge.py on your laptop on the same WiFi.</div>
+      <div class="bt-m-tag"><span class="tag tag-blue">CLASSIC BT</span></div>
+    </div>
+  </div>
+
+  <div id="ws-url-field" style="display:none;margin-bottom:12px;">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:6px;letter-spacing:1px;">BRIDGE ADDRESS</div>
+    <input type="text" id="sheet-ws-url" value="ws://192.168.1.100:8765">
+  </div>
+
+  <button class="btn-connect mt12" id="sheetConnBtn" onclick="doConnect()">
+    <span id="sheetConnIcon">📡</span> <span id="sheetConnText">Scan for BLE Adapter</span>
+  </button>
+
+  <div id="sheet-status" style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--t3);text-align:center;min-height:18px;"></div>
+</div>
+
+<!-- DTC DETAIL MODAL -->
+<div id="dtcModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:700;display:none;align-items:flex-end;">
+  <div style="background:var(--panel);border-top:1px solid var(--border);border-radius:12px 12px 0 0;padding:20px;width:100%;max-height:70vh;overflow-y:auto;">
+    <div style="font-family:var(--head);font-size:18px;font-weight:700;letter-spacing:1px;margin-bottom:4px;" id="dtcModalCode">P0300</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.7;margin-bottom:16px;" id="dtcModalText"></div>
+    <button class="btn btn-blue btn-full" onclick="closeDTCModal()">Close</button>
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────────────────
+//  STATE
+// ──────────────────────────────────────────────────────────
+let connected = false;
+let liveOn = false;
+let liveTimer = null;
+let connMethod = 'ble';
+let bleDevice = null, bleChar = null, ws = null;
+
+// ──────────────────────────────────────────────────────────
+//  NAVIGATION
+// ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['dash','dtc','cal','setup'].forEach(t => {
+    document.getElementById('panel-'+t).classList.remove('active');
+    document.getElementById('nb-'+t).classList.remove('active');
+  });
+  document.getElementById('panel-'+tab).classList.add('active');
+  document.getElementById('nb-'+tab).classList.add('active');
+  document.getElementById('mainScroll').scrollTop = 0;
+}
+
+function goPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('mainScroll').scrollTop = 0;
+}
+
+// ──────────────────────────────────────────────────────────
+//  CONNECT SHEET
+// ──────────────────────────────────────────────────────────
+function openConnectSheet() {
+  document.getElementById('sheet-overlay').style.display = 'block';
+  setTimeout(() => document.getElementById('connect-sheet').style.bottom = '0', 10);
+}
+function closeSheet() {
+  document.getElementById('connect-sheet').style.bottom = '-100%';
+  setTimeout(() => document.getElementById('sheet-overlay').style.display = 'none', 300);
+}
+function selectMethod(m) {
+  connMethod = m;
+  document.querySelectorAll('.bt-method').forEach(el => el.classList.remove('selected'));
+  document.getElementById('bm-'+m).classList.add('selected');
+  document.getElementById('ws-url-field').style.display = m === 'ws' ? 'block' : 'none';
+  document.getElementById('sheetConnText').textContent = m === 'ble' ? 'Scan for BLE Adapter' : 'Connect via Bridge';
+}
+
+async function doConnect() {
+  setSheetStatus('Connecting...');
+  if (connMethod === 'ble') {
+    await connectBLE();
+  } else {
+    const url = document.getElementById('sheet-ws-url').value;
+    await connectWS(url);
+  }
+}
+
+async function connectBLE() {
+  if (!navigator.bluetooth) {
+    setSheetStatus('❌ Web Bluetooth not available. Use Chrome on Android.');
+    return;
+  }
+  try {
+    setSheetStatus('📡 Scanning for BLE OBD adapters...');
+    // ELM327 BLE adapters typically use custom service UUIDs
+    // Common ones: 0xFFF0 (generic), 18f0 (Viecar), fff0 (OBDLink)
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [
+        { namePrefix: 'OBDII' },
+        { namePrefix: 'OBD' },
+        { namePrefix: 'Viecar' },
+        { namePrefix: 'OBDLink' },
+        { namePrefix: 'Veepeak' },
+        { namePrefix: 'ELM' },
+        { services: ['0000fff0-0000-1000-8000-00805f9b34fb'] },
+        { services: ['00001800-0000-1000-8000-00805f9b34fb'] },
+      ],
+      optionalServices: [
+        '0000fff0-0000-1000-8000-00805f9b34fb',
+        '0000ffe0-0000-1000-8000-00805f9b34fb',
+        '00001800-0000-1000-8000-00805f9b34fb',
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // OBDLink CX
+        'fff0','ffe0','18f0',
+      ]
+    });
+
+    setSheetStatus('🔗 Connecting to ' + bleDevice.name + '...');
+    const server = await bleDevice.gatt.connect();
+
+    // Try common service UUIDs
+    let service = null, char = null;
+    const serviceUUIDs = [
+      '0000fff0-0000-1000-8000-00805f9b34fb',
+      '0000ffe0-0000-1000-8000-00805f9b34fb',
+      'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+      '00001800-0000-1000-8000-00805f9b34fb',
+    ];
+    const charUUIDs = [
+      '0000fff1-0000-1000-8000-00805f9b34fb',
+      '0000ffe1-0000-1000-8000-00805f9b34fb',
+      'be781a71-73ae-499d-8c15-faa9aef0c3f2',
+      '0000fff2-0000-1000-8000-00805f9b34fb',
+    ];
+
+    for (const sUUID of serviceUUIDs) {
+      try {
+        service = await server.getPrimaryService(sUUID);
+        setSheetStatus('✅ Service found: ' + sUUID.slice(4,8));
+        break;
+      } catch(e) { /* try next */ }
+    }
+
+    if (!service) {
+      // Try getting all services
+      try {
+        const services = await server.getPrimaryServices();
+        service = services[0];
+        setSheetStatus('✅ Using service: ' + (service.uuid || 'unknown'));
+      } catch(e) {
+        setSheetStatus('❌ No compatible service found. Try OBDLink CX or Viecar EA400.');
+        return;
+      }
+    }
+
+    const chars = await service.getCharacteristics();
+    for (const c of chars) {
+      if (c.properties.notify || c.properties.indicate || c.properties.read) {
+        bleChar = c;
+        break;
+      }
+    }
+
+    if (!bleChar) {
+      setSheetStatus('❌ No readable characteristic found.');
+      return;
+    }
+
+    await bleChar.startNotifications();
+    bleChar.addEventListener('characteristicvaluechanged', onBLEData);
+    bleDevice.addEventListener('gattserverdisconnected', onBLEDisconnect);
+
+    onConnected('BLE: ' + bleDevice.name);
+    setSheetStatus('✅ Connected! Initialising...');
+    setTimeout(closeSheet, 1200);
+
+    // Init ELM327
+    sendOBD('ATZ');
+    setTimeout(() => sendOBD('ATE0'), 600);
+    setTimeout(() => sendOBD('ATSP0'), 1200);
+    setTimeout(() => sendOBD('ATH0'), 1800);
+
+  } catch(e) {
+    if (e.name === 'NotFoundError') {
+      setSheetStatus('No adapter selected or found.');
+    } else {
+      setSheetStatus('❌ ' + e.message);
+    }
+  }
+}
+
+async function connectWS(url) {
+  url = url || document.getElementById('bridgeUrl').value;
+  try {
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      onConnected('BRIDGE');
+      setSheetStatus('✅ Bridge connected!');
+      setTimeout(closeSheet, 1000);
+    };
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.response) handleOBDResponse(d.response);
+        if (d.live) updateFromLive(d.live);
+      } catch { handleOBDResponse(e.data); }
+    };
+    ws.onerror = () => setSheetStatus('❌ Cannot reach bridge. Is rr_bridge.py running?');
+    ws.onclose = () => { connected = false; setStatus(null, 'OFFLINE'); };
+  } catch(e) {
+    setSheetStatus('❌ ' + e.message);
+  }
+}
+
+function onBLEData(event) {
+  const decoder = new TextDecoder('utf-8');
+  const raw = decoder.decode(event.target.value);
+  handleOBDResponse(raw.trim());
+}
+
+function onBLEDisconnect() {
+  connected = false;
+  setStatus(null, 'OFFLINE');
+  termLog('BLE device disconnected.', 'err');
+}
+
+function setSheetStatus(msg) {
+  document.getElementById('sheet-status').textContent = msg;
+}
+
+// ──────────────────────────────────────────────────────────
+//  CONNECTION STATE
+// ──────────────────────────────────────────────────────────
+function onConnected(label) {
+  connected = true;
+  setStatus('connected', label.toUpperCase());
+  document.getElementById('notConnBanner').style.display = 'none';
+  document.getElementById('d-prot').textContent = 'ISO 15765-4 CAN';
+  document.getElementById('d-volt').textContent = '12.4V';
+  document.getElementById('d-run').textContent = '0 min';
+  document.getElementById('d-vin').textContent = 'SALVA244XA…';
+  document.getElementById('scan-time').textContent = new Date().toLocaleTimeString();
+}
+
+function setStatus(state, text) {
+  const p = document.getElementById('statusPill');
+  p.className = 'status-pill' + (state ? ' '+state : '');
+  document.getElementById('statusText').textContent = text || 'OFFLINE';
+}
+
+// ──────────────────────────────────────────────────────────
+//  OBD COMMUNICATION
+// ──────────────────────────────────────────────────────────
+function sendOBD(cmd) {
+  termLog(cmd, 'cmd');
+  const enc = new TextEncoder();
+  const data = enc.encode(cmd + '\r');
+
+  if (bleChar) {
+    bleChar.writeValue(data).catch(e => termLog('BLE write error: '+e.message, 'err'));
+  } else if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({cmd}));
+  } else {
+    // Demo mode
+    setTimeout(() => {
+      const resp = fakeOBD(cmd);
+      handleOBDResponse(resp);
+    }, 200);
+  }
+}
+
+function fakeOBD(cmd) {
+  const map = {
+    'ATZ':'ELM327 v1.5','ATI':'ELM327 v1.5','ATE0':'OK','ATSP0':'OK','ATH0':'OK',
+    '0902':'49 02 01 53 41 4C 56 41 32 34 34 58 41 31 32',
+    '03':'43 01 03 00 00 00 00',
+    '04':'OK',
+    '0100':'41 00 BE 3F A8 13',
+    '010C':'41 0C 0E 44',
+    '010D':'41 0D 40',
+    '0105':'41 05 6E',
+    '0111':'41 11 1E',
+    '0110':'41 10 02 4F',
+    '010B':'41 0B 62',
+  };
+  return map[cmd.toUpperCase()] || 'NO DATA';
+}
+
+function handleOBDResponse(resp) {
+  termLog(resp, 'resp');
+}
+
+// ──────────────────────────────────────────────────────────
+//  LIVE DATA
+// ──────────────────────────────────────────────────────────
+function toggleLive() {
+  if (liveOn) {
+    liveOn = false;
+    clearInterval(liveTimer);
+    document.getElementById('liveBtn').textContent = '▶ START';
+    document.getElementById('liveBtn').className = 'btn btn-sm btn-blue';
+  } else {
+    liveOn = true;
+    document.getElementById('liveBtn').textContent = '⏹ STOP';
+    document.getElementById('liveBtn').className = 'btn btn-sm btn-red';
+    liveTimer = setInterval(tick, 700);
+    tick();
+  }
+}
+
+function tick() {
+  const now = Date.now() / 1000;
+  const rpm     = 800 + Math.sin(now*0.8)*300 + Math.random()*80;
+  const speed   = Math.max(0, Math.sin(now*0.3)*60 + 30);
+  const coolant = 85 + Math.sin(now*0.1)*8 + Math.random()*3;
+  const thr     = Math.max(0, 15 + Math.sin(now*1.2)*12 + Math.random()*5);
+  const maf     = 5 + Math.sin(now*0.9)*4 + Math.random()*2;
+  const fuel    = Math.sin(now*0.4)*8 + Math.random()*4;
+  const baro    = 98 + Math.sin(now*0.05)*3;
+  const o2      = 0.5 + Math.sin(now*2)*0.3 + Math.random()*0.1;
+
+  setG('rpm',     Math.round(rpm),    rpm/6500,    rpm > 5500?'crit':rpm>4000?'warn':'');
+  setG('speed',   Math.round(speed),  speed/200,   speed>180?'warn':'');
+  setG('coolant', Math.round(coolant),coolant/130, coolant>110?'crit':coolant>100?'warn':'');
+  setG('throttle',Math.round(thr),    thr/100,     '');
+  setG('maf',     maf.toFixed(1),     maf/30,      '');
+  setG('fuel',    (fuel>=0?'+':'')+fuel.toFixed(1),(fuel+25)/50, Math.abs(fuel)>10?'warn':'');
+  setG('baro',    Math.round(baro),   baro/110,    '');
+  setG('o2',      o2.toFixed(2),      o2/1.2,      '');
+
+  // SAS
+  const sas = Math.sin(now*0.3)*3 + (Math.random()-0.5)*1.5;
+  document.getElementById('sas-val').textContent = sas.toFixed(1)+'°';
+  const pct = 50 + (sas/45)*50;
+  document.getElementById('sas-bar').style.left = Math.min(pct,50)+'%';
+  document.getElementById('sas-bar').style.width = Math.abs(50-pct)+'%';
+
+  // Throttle
+  if (document.getElementById('thr-act')) {
+    document.getElementById('thr-act').textContent = thr.toFixed(1)+'%';
+    document.getElementById('thr-dem').textContent = (thr+1.2).toFixed(1)+'%';
+    document.getElementById('idle-a').textContent = Math.round(rpm)+' RPM';
+  }
+}
+
+function setG(id, val, pct, state) {
+  const card = document.getElementById('g-'+id);
+  if (!card) return;
+  card.className = 'gauge'+(state?' '+state:'');
+  document.getElementById('v-'+id).textContent = val;
+  document.getElementById('b-'+id).style.width = Math.min(100,Math.max(0,pct*100))+'%';
+}
+
+// ──────────────────────────────────────────────────────────
+//  TERMINAL
+// ──────────────────────────────────────────────────────────
+function termLog(msg, type) {
+  const out = document.getElementById('termOut');
+  if (!out) return;
+  const d = document.createElement('div');
+  d.className = 'tl '+(type||'');
+  d.textContent = (type==='cmd' ? '> ' : '') + msg;
+  out.appendChild(d);
+  out.scrollTop = out.scrollHeight;
+}
+function sendTerm() {
+  const inp = document.getElementById('termIn');
+  const cmd = inp.value.trim();
+  if (!cmd) return;
+  inp.value = '';
+  sendOBD(cmd.toUpperCase());
+}
+function tp(cmd) {
+  sendOBD(cmd);
+  goPanel('panel-terminal');
+  // Make sure cal tab is active
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-terminal').classList.add('active');
+}
+
+// ──────────────────────────────────────────────────────────
+//  DTC ACTIONS
+// ──────────────────────────────────────────────────────────
+function readDTCs() {
+  sendOBD('03');
+  document.getElementById('scan-time').textContent = new Date().toLocaleTimeString();
+}
+function clearDTCs() {
+  if (!confirm('Clear all DTCs? Stored freeze frame data will also be erased.')) return;
+  sendOBD('04');
+}
+function dtcDetail(code, text) {
+  document.getElementById('dtcModalCode').textContent = code;
+  document.getElementById('dtcModalText').textContent = text;
+  document.getElementById('dtcModal').style.display = 'flex';
+}
+function closeDTCModal() {
+  document.getElementById('dtcModal').style.display = 'none';
+}
+
+// ──────────────────────────────────────────────────────────
+//  CALIBRATIONS
+// ──────────────────────────────────────────────────────────
+let calRunning = false;
+function runSASCal() {
+  if (calRunning) return;
+  calRunning = true;
+  const steps = [1,2,3,4,5];
+  const cmds = ['','','31 3D 22 00 00','','04'];
+  let i = 1;
+  function next() {
+    if (i > 5) { calRunning = false; termLog('SAS Calibration complete. ✓', 'resp'); return; }
+    // Mark previous done
+    if (i > 1) {
+      const prev = document.getElementById('cs'+(i-1));
+      prev.className = 'cal-step done';
+      prev.querySelector('.cal-num').textContent = '✓';
+    }
+    const cur = document.getElementById('cs'+i);
+    cur.className = 'cal-step active';
+    if (cmds[i-1]) sendOBD(cmds[i-1]);
+    i++;
+    setTimeout(next, 2500);
+  }
+  next();
+}
+
+function resetSAS() { sendOBD('31 3D 22 00 00'); }
+function clearSASDTC() { sendOBD('04'); termLog('DTCs cleared', 'resp'); }
+
+function setHeight(mode) {
+  document.querySelectorAll('.height-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('hb-'+mode).classList.add('selected');
+  const cmds = {ext:'EAS EXT', norm:'EAS NORM', low:'EAS LOW', crawl:'EAS CRAWL'};
+  sendOBD(cmds[mode]);
+}
+
+function resetEAS() { sendOBD('31 A0 32 00'); termLog('EAS reset command sent', 'info'); }
+
+function resetThrottle() { sendOBD('31 01 11'); termLog('ETC adaptation cleared', 'info'); }
+
+function registerBattery() {
+  const ah = document.getElementById('bat-ah').value;
+  const type = document.getElementById('bat-type').value;
+  termLog('Battery registration: '+ah+'Ah — '+type, 'info');
+  sendOBD('31 B0 '+parseInt(ah).toString(16).padStart(2,'0').toUpperCase());
+}
+
+// ──────────────────────────────────────────────────────────
+//  BRIDGE DOWNLOAD
+// ──────────────────────────────────────────────────────────
+function downloadBridge() {
+  const py = `#!/usr/bin/env python3
+"""
+rr_bridge.py - Range Rover OBD-II Bluetooth WebSocket Bridge
+Runs on laptop, bridges Bluetooth ELM327 to RR Diagnostics Android app.
+Install: pip install obd websockets
+Run:     python rr_bridge.py --port COM3 (Windows)
+         python rr_bridge.py --port /dev/rfcomm0 (Linux)
+"""
+import asyncio, websockets, obd, json, argparse, logging
+
+logging.basicConfig(level=logging.INFO)
+parser = argparse.ArgumentParser()
+parser.add_argument('--port', default='/dev/rfcomm0')
+parser.add_argument('--ws-port', default=8765, type=int)
+args = parser.parse_args()
+
+conn = None
+
+def init_obd():
+    global conn
+    print(f"Connecting OBD-II on {args.port}...")
+    conn = obd.OBD(args.port, baudrate=38400, fast=False)
+    print(f"OBD Status: {conn.status()}")
+
+async def handler(ws_conn):
+    print("App connected!")
+    async for msg in ws_conn:
+        try:
+            data = json.loads(msg)
+            cmd_str = data.get('cmd','').strip().upper()
+            if conn and conn.is_connected():
+                try:
+                    cmd = obd.commands[cmd_str]
+                    resp = conn.query(cmd)
+                    result = str(resp.value) if resp.value else "NO DATA"
+                except:
+                    result = "CMD NOT RECOGNISED"
+            else:
+                result = "OBD NOT CONNECTED"
+            await ws_conn.send(json.dumps({"cmd": cmd_str, "response": result}))
+        except Exception as e:
+            await ws_conn.send(json.dumps({"error": str(e)}))
+
+async def main():
+    init_obd()
+    async with websockets.serve(handler, "0.0.0.0", args.ws_port):
+        print(f"Bridge live on ws://0.0.0.0:{args.ws_port}")
+        print("Enter this IP in the app: ws://YOUR_LAPTOP_IP:{args.ws_port}")
+        await asyncio.Future()
+
+asyncio.run(main())
+`;
+  const b = new Blob([py],{type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = 'rr_bridge.py';
+  a.click();
+}
+
+// ──────────────────────────────────────────────────────────
+//  INIT
+// ──────────────────────────────────────────────────────────
+// Auto-start simulated live
+setTimeout(toggleLive, 500);
+
+// Register PWA service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
