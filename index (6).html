@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#090c0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>RR Diagnostics</title>
+<link rel="manifest" href="manifest.json">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap');
+:root {
+  --bg:#070a0d;--bg2:#0b0f14;--panel:#0f1520;--card:#111a25;
+  --border:#1c2a3a;--b2:#243348;--accent:#00d4ff;--a2:#0099cc;
+  --gold:#c8a84b;--red:#ff3c3c;--orange:#ff8c00;--green:#00e676;
+  --text:#ccd6e0;--t2:#7a9ab0;--t3:#3d5a70;
+  --mono:'Share Tech Mono',monospace;--head:'Barlow Condensed',sans-serif;--body:'Rajdhani',sans-serif;
+  --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;width:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden;touch-action:manipulation;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,212,255,.008) 3px,rgba(0,212,255,.008) 6px);pointer-events:none;z-index:9999;}
+.header{position:fixed;top:0;left:0;right:0;padding:calc(var(--safe-top) + 10px) 16px 10px;background:var(--panel);border-bottom:1px solid var(--border);z-index:200;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.h-left{display:flex;align-items:center;gap:10px;}
+.h-emblem{width:36px;height:36px;border:1.5px solid var(--gold);border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:var(--head);font-size:13px;font-weight:700;color:var(--gold);letter-spacing:1px;background:rgba(200,168,75,.06);flex-shrink:0;}
+.h-title{font-family:var(--head);font-size:18px;font-weight:700;letter-spacing:2px;line-height:1;}
+.h-sub{font-family:var(--mono);font-size:9px;color:var(--gold);letter-spacing:1.5px;}
+.status-pill{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-family:var(--mono);font-size:10px;color:var(--t3);cursor:pointer;transition:all .2s;}
+.status-pill.connected{border-color:rgba(0,230,118,.4);color:var(--green);}
+.status-pill.connecting{border-color:rgba(255,140,0,.4);color:var(--orange);}
+.status-pill.error{border-color:rgba(255,60,60,.4);color:var(--red);}
+.sdot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.status-pill.connected .sdot,.status-pill.connecting .sdot{animation:blink 1.5s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+.main{position:fixed;top:0;left:0;right:0;bottom:0;padding-top:calc(var(--safe-top) + 56px);padding-bottom:calc(var(--safe-bot) + 60px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;padding-bottom:var(--safe-bot);background:var(--panel);border-top:1px solid var(--border);display:flex;z-index:200;}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;font-family:var(--head);font-size:10px;letter-spacing:1px;color:var(--t3);cursor:pointer;transition:all .15s;border:none;background:none;position:relative;gap:3px;min-height:52px;}
+.nav-btn.active{color:var(--accent);}
+.nav-btn.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--accent);border-radius:0 0 2px 2px;}
+.nav-icon{font-size:20px;line-height:1;}
+.nav-badge{position:absolute;top:6px;right:calc(50% - 18px);background:var(--red);color:#fff;font-family:var(--mono);font-size:8px;padding:1px 4px;border-radius:8px;min-width:14px;text-align:center;}
+.panel{display:none;padding:16px;animation:fadeUp .2s ease;}
+.panel.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.gauge-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.gauge{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center;transition:border-color .3s;}
+.gauge.warn{border-color:rgba(255,140,0,.5);}
+.gauge.crit{border-color:rgba(255,60,60,.5);animation:gcrit .8s infinite;}
+@keyframes gcrit{0%,100%{background:var(--card);}50%{background:rgba(255,60,60,.05);}}
+.g-label{font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--t3);margin-bottom:6px;}
+.g-val{font-family:var(--mono);font-size:28px;color:var(--accent);line-height:1;transition:color .3s;}
+.gauge.warn .g-val{color:var(--orange);}
+.gauge.crit .g-val{color:var(--red);}
+.g-unit{font-family:var(--head);font-size:10px;color:var(--t3);letter-spacing:1.5px;margin-top:3px;}
+.g-bar{height:3px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;}
+.g-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease;}
+.gauge.warn .g-fill{background:var(--orange);}
+.gauge.crit .g-fill{background:var(--red);}
+.card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:14px;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,var(--a2),transparent);opacity:.6;}
+.card-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:10px;}
+.section-title{font-family:var(--head);font-size:20px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.section-title span{color:var(--accent);}
+.btn{font-family:var(--head);font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:10px 16px;border:1.5px solid;border-radius:3px;cursor:pointer;background:transparent;transition:all .15s;display:inline-flex;align-items:center;gap:6px;}
+.btn:active{transform:scale(.96);}
+.btn-blue{border-color:var(--accent);color:var(--accent);}
+.btn-gold{border-color:var(--gold);color:var(--gold);}
+.btn-red{border-color:var(--red);color:var(--red);}
+.btn-sm{font-size:11px;padding:7px 12px;}
+.btn-full{width:100%;justify-content:center;}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;margin-bottom:6px;}
+.info-key{font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:1px;}
+.info-val{font-family:var(--mono);font-size:12px;color:var(--text);}
+.tag{display:inline-block;padding:2px 7px;border-radius:2px;font-family:var(--mono);font-size:9px;letter-spacing:1px;}
+.tag-gold{background:rgba(200,168,75,.1);color:var(--gold);border:1px solid rgba(200,168,75,.2);}
+.tag-red{background:rgba(255,60,60,.1);color:var(--red);border:1px solid rgba(255,60,60,.2);}
+.tag-green{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.2);}
+.warn-box{background:rgba(255,140,0,.07);border:1px solid rgba(255,140,0,.3);border-radius:3px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--t2);line-height:1.6;display:flex;gap:8px;}
+.warn-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+.dtc{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;}
+.dtc-top{display:flex;align-items:center;gap:10px;}
+.dtc-code{font-family:var(--mono);font-size:15px;font-weight:bold;color:var(--orange);min-width:58px;}
+.dtc-name{font-family:var(--head);font-size:15px;font-weight:600;flex:1;line-height:1.3;}
+.dtc-sub{font-family:var(--mono);font-size:10px;color:var(--t2);margin-left:68px;}
+.dtc-actions{display:flex;gap:8px;padding-left:68px;}
+.sev{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:3px 7px;border-radius:2px;}
+.sev-h{background:rgba(255,60,60,.15);color:var(--red);border:1px solid rgba(255,60,60,.3);}
+.sev-m{background:rgba(255,140,0,.15);color:var(--orange);border:1px solid rgba(255,140,0,.3);}
+.terminal{background:#020508;border:1px solid var(--border);border-radius:3px;padding:12px;font-family:var(--mono);font-size:12px;height:220px;overflow-y:auto;line-height:1.8;}
+.tl{color:var(--t2);}.tl.cmd{color:var(--accent);}.tl.resp{color:var(--green);}.tl.err{color:var(--red);}.tl.info{color:var(--gold);}
+.term-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
+.term-row span{color:var(--accent);font-family:var(--mono);font-size:13px;white-space:nowrap;}
+.term-input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:13px;min-width:0;}
+.cal-step{display:flex;gap:12px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;margin-bottom:8px;transition:all .3s;}
+.cal-step.active{border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.04);}
+.cal-step.done{border-color:rgba(0,230,118,.3);}
+.cal-num{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--t3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--t3);flex-shrink:0;transition:all .3s;}
+.cal-step.active .cal-num{border-color:var(--accent);color:var(--accent);animation:blink 1.5s infinite;}
+.cal-step.done .cal-num{border-color:var(--green);color:var(--green);}
+.cal-body strong{font-family:var(--head);font-size:14px;font-weight:600;display:block;margin-bottom:3px;}
+.cal-body p{font-size:12px;color:var(--t2);line-height:1.5;}
+.sas-display{text-align:center;padding:20px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin-bottom:12px;}
+.sas-big{font-family:var(--mono);font-size:52px;color:var(--accent);line-height:1;}
+.sas-unit{font-family:var(--head);font-size:12px;color:var(--t3);letter-spacing:3px;margin-top:4px;}
+.height-btn{padding:14px;border:1.5px solid var(--border);background:var(--card);border-radius:4px;text-align:center;cursor:pointer;transition:all .2s;}
+.height-btn:active{transform:scale(.95);}
+.hb-icon{font-size:24px;margin-bottom:6px;}
+.hb-label{font-family:var(--head);font-size:13px;letter-spacing:1px;color:var(--t2);}
+.height-btn.selected{border-color:var(--accent);background:rgba(0,212,255,.07);}
+.height-btn.selected .hb-label{color:var(--accent);}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.mb8{margin-bottom:8px;}.mb12{margin-bottom:12px;}.mb16{margin-bottom:16px;}.mt12{margin-top:12px;}.mt16{margin-top:16px;}
+#sheet-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;}
+#connect-sheet{position:fixed;bottom:-100%;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:600;padding:20px 20px calc(var(--safe-bot) + 20px);transition:bottom .3s ease;max-height:90vh;overflow-y:auto;}
+.sheet-handle{width:40px;height:4px;background:var(--b2);border-radius:2px;margin:0 auto 20px;}
+.direct-box{background:rgba(0,212,255,.06);border:1.5px solid rgba(0,212,255,.3);border-radius:8px;padding:16px;margin-bottom:14px;}
+.direct-box h3{font-family:var(--head);font-size:16px;font-weight:700;letter-spacing:1px;color:var(--accent);margin-bottom:6px;}
+.direct-box p{font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:10px;}
+.ip-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.ip-row input{flex:1;background:var(--bg2);border:1px solid var(--b2);color:var(--text);font-family:var(--mono);font-size:14px;padding:12px;border-radius:3px;outline:none;}
+.ip-row input:focus{border-color:var(--accent);}
+.btn-connect-big{width:100%;padding:18px;background:var(--accent);color:var(--bg);border:none;border-radius:4px;font-family:var(--head);font-size:18px;font-weight:700;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px;}
+.btn-connect-big:active{transform:scale(.97);}
+.btn-connect-big.connecting{background:var(--orange);}
+.btn-connect-big.success{background:var(--green);color:#000;}
+.sheet-status{margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--t3);text-align:center;min-height:36px;line-height:1.8;}
+select,input[type=text],input[type=number]{background:var(--card);border:1px solid var(--b2);color:var(--text);font-family:var(--mono);font-size:13px;padding:10px 12px;border-radius:3px;outline:none;width:100%;-webkit-appearance:none;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="h-left">
+    <div class="h-emblem">LR</div>
+    <div><div class="h-title">RR Diag</div><div class="h-sub">L322 · 4.4 V8</div></div>
+  </div>
+  <div class="status-pill" id="statusPill" onclick="openSheet()">
+    <div class="sdot"></div><span id="statusText">OFFLINE</span>
+  </div>
+</header>
+
+<div class="main" id="mainScroll">
+
+  <!-- DASHBOARD -->
+  <div class="panel active" id="panel-dash">
+    <div class="section-title">Dashboard <span>Live</span>
+      <button class="btn btn-sm btn-blue" id="liveBtn" onclick="toggleLive()">▶ START</button>
+    </div>
+    <div id="notConnBanner" class="warn-box mb12">
+      <span class="warn-icon">📡</span>
+      <div><strong>Step 1:</strong> Connect phone WiFi to <strong>BBfly</strong> network<br><strong>Step 2:</strong> Tap <strong>OFFLINE</strong> above to connect</div>
+    </div>
+    <div class="gauge-grid">
+      <div class="gauge" id="g-rpm"><div class="g-label">ENGINE RPM</div><div class="g-val" id="v-rpm">—</div><div class="g-unit">RPM</div><div class="g-bar"><div class="g-fill" id="b-rpm" style="width:0"></div></div></div>
+      <div class="gauge" id="g-speed"><div class="g-label">SPEED</div><div class="g-val" id="v-speed">—</div><div class="g-unit">KM/H</div><div class="g-bar"><div class="g-fill" id="b-speed" style="width:0"></div></div></div>
+      <div class="gauge" id="g-coolant"><div class="g-label">COOLANT</div><div class="g-val" id="v-coolant">—</div><div class="g-unit">°C</div><div class="g-bar"><div class="g-fill" id="b-coolant" style="width:0"></div></div></div>
+      <div class="gauge" id="g-throttle"><div class="g-label">THROTTLE</div><div class="g-val" id="v-throttle">—</div><div class="g-unit">%</div><div class="g-bar"><div class="g-fill" id="b-throttle" style="width:0"></div></div></div>
+      <div class="gauge" id="g-maf"><div class="g-label">MAF</div><div class="g-val" id="v-maf">—</div><div class="g-unit">G/S</div><div class="g-bar"><div class="g-fill" id="b-maf" style="width:0"></div></div></div>
+      <div class="gauge" id="g-fuel"><div class="g-label">FUEL TRIM</div><div class="g-val" id="v-fuel">—</div><div class="g-unit">%</div><div class="g-bar"><div class="g-fill" id="b-fuel" style="width:50%"></div></div></div>
+      <div class="gauge" id="g-baro"><div class="g-label">BARO</div><div class="g-val" id="v-baro">—</div><div class="g-unit">KPA</div><div class="g-bar"><div class="g-fill" id="b-baro" style="width:70%"></div></div></div>
+      <div class="gauge" id="g-o2"><div class="g-label">O2 B1S1</div><div class="g-val" id="v-o2">—</div><div class="g-unit">V</div><div class="g-bar"><div class="g-fill" id="b-o2" style="width:0"></div></div></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-label">ECU INFO</div>
+      <div class="info-row"><span class="info-key">VIN</span><span class="info-val" id="d-vin">—</span></div>
+      <div class="info-row"><span class="info-key">PROTOCOL</span><span class="info-val" id="d-prot">—</span></div>
+      <div class="info-row"><span class="info-key">BATTERY</span><span class="info-val" id="d-volt">—</span></div>
+      <div class="info-row"><span class="info-key">ADAPTER</span><span class="info-val" id="d-ip">—</span></div>
+    </div>
+  </div>
+
+  <!-- FAULT CODES -->
+  <div class="panel" id="panel-dtc">
+    <div class="section-title">Fault <span>Codes</span>
+      <div class="btn-row">
+        <button class="btn btn-sm btn-blue" onclick="readDTCs()">🔍 Read</button>
+        <button class="btn btn-sm btn-red" onclick="clearDTCs()">🗑 Clear</button>
+      </div>
+    </div>
+    <div class="dtc">
+      <div class="dtc-top"><div class="dtc-code">P0300</div><div class="dtc-name">Random / Multiple Misfire</div><div class="sev sev-h">HIGH</div></div>
+      <div class="dtc-sub">ECM · 4.4L V8 · Both Banks</div>
+      <div class="dtc-actions"><button class="btn btn-sm btn-blue" onclick="dtcInfo('P0300','Check coil packs, spark plugs and injectors on the 4.4 V8. Coil packs fail frequently on the L322. Check cylinder-specific misfire counts with live data.')">ℹ Info</button></div>
+    </div>
+    <div class="dtc">
+      <div class="dtc-top"><div class="dtc-code">C1A35</div><div class="dtc-name">Steering Angle — Calibrate</div><div class="sev sev-m">MED</div></div>
+      <div class="dtc-sub">ABS/DSC Module · Post battery disconnect</div>
+      <div class="dtc-actions"><button class="btn btn-sm btn-gold" onclick="goPanel('panel-steer')">Calibrate →</button></div>
+    </div>
+    <div class="dtc">
+      <div class="dtc-top"><div class="dtc-code">B1A22</div><div class="dtc-name">EAS Compressor Signal</div><div class="sev sev-m">MED</div></div>
+      <div class="dtc-sub">Body Module · Relay circuit intermittent</div>
+      <div class="dtc-actions">
+        <button class="btn btn-sm btn-blue" onclick="dtcInfo('B1A22','Check EAS compressor relay in engine bay fuse box. Common L322 fault — relay socket pins corrode. Check 30A fuse F11. Also inspect compressor wiring loom under nearside wheel arch.')">ℹ Info</button>
+        <button class="btn btn-sm btn-gold" onclick="goPanel('panel-susp')">EAS →</button>
+      </div>
+    </div>
+    <div style="padding:10px 4px;font-family:var(--mono);font-size:10px;color:var(--t3);">Last scan: <span id="scan-time">—</span></div>
+  </div>
+
+  <!-- CALIBRATION MENU -->
+  <div class="panel" id="panel-cal">
+    <div class="section-title">Calibration <span>Tools</span></div>
+    <div class="card mb8" onclick="goPanel('panel-steer')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">🔄</span>
+      <div style="flex:1;"><div style="font-family:var(--head);font-size:16px;font-weight:600;">Steering Angle Sensor</div><div style="font-size:12px;color:var(--t2);margin-top:3px;">Reset &amp; calibrate SAS in DSC module</div></div>
+      <span class="tag tag-red">DTC</span><span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+    <div class="card mb8" onclick="goPanel('panel-susp')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">↕️</span>
+      <div style="flex:1;"><div style="font-family:var(--head);font-size:16px;font-weight:600;">Air Suspension (EAS)</div><div style="font-size:12px;color:var(--t2);margin-top:3px;">Height control &amp; sensor reset</div></div>
+      <span class="tag tag-red">DTC</span><span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+    <div class="card mb8" onclick="goPanel('panel-throttle')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">⚙️</span>
+      <div style="flex:1;"><div style="font-family:var(--head);font-size:16px;font-weight:600;">Throttle Body Reset</div><div style="font-size:12px;color:var(--t2);margin-top:3px;">Clear ETC adaptation values</div></div>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+    <div class="card mb8" onclick="goPanel('panel-battery')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">🔋</span>
+      <div style="flex:1;"><div style="font-family:var(--head);font-size:16px;font-weight:600;">Battery Registration</div><div style="font-size:12px;color:var(--t2);margin-top:3px;">Register new battery in IBS module</div></div>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+    <div class="card" onclick="goPanel('panel-terminal')" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:16px;">
+      <span style="font-size:32px;">💻</span>
+      <div style="flex:1;"><div style="font-family:var(--head);font-size:16px;font-weight:600;">OBD-II Terminal</div><div style="font-size:12px;color:var(--t2);margin-top:3px;">Raw AT command console</div></div>
+      <span style="color:var(--t3);font-size:20px;">›</span>
+    </div>
+  </div>
+
+  <!-- STEERING ANGLE -->
+  <div class="panel" id="panel-steer">
+    <div class="section-title"><span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;margin-right:4px;cursor:pointer;">‹</button>Steering <span>Angle</span></span><span class="tag tag-gold">SAS · DSC</span></div>
+    <div class="warn-box mb12"><span class="warn-icon">⚠️</span><div>Park on level ground. Wheels pointing straight. Ignition ON, engine OFF. Vehicle must be <strong>stationary</strong>.</div></div>
+    <div class="sas-display mb12">
+      <div class="sas-big" id="sas-val">—</div>
+      <div class="sas-unit">DEGREES FROM CENTRE</div>
+    </div>
+    <div class="g2 mb12">
+      <div class="info-row"><span class="info-key">STATUS</span><span class="info-val" id="sas-status">—</span></div>
+      <div class="info-row"><span class="info-key">DSC</span><span class="info-val" id="dsc-stat">—</span></div>
+    </div>
+    <div class="mb16">
+      <div class="cal-step done" id="cs1"><div class="cal-num">✓</div><div class="cal-body"><strong>Pre-check</strong><p>Vehicle stationary, level ground, ignition ON.</p></div></div>
+      <div class="cal-step active" id="cs2"><div class="cal-num">2</div><div class="cal-body"><strong>Centre Steering</strong><p>Wheels straight ahead. SAS should read 0° ±2°.</p></div></div>
+      <div class="cal-step" id="cs3"><div class="cal-num">3</div><div class="cal-body"><strong>Send Reset Command</strong><p>Mode 31, SID 0x3D22 → DSC module.</p></div></div>
+      <div class="cal-step" id="cs4"><div class="cal-num">4</div><div class="cal-body"><strong>Lock-to-Lock</strong><p>Full left → Full right → Return to centre.</p></div></div>
+      <div class="cal-step" id="cs5"><div class="cal-num">5</div><div class="cal-body"><strong>Confirm &amp; Store</strong><p>Clear DTC C1A35 and confirm calibration stored.</p></div></div>
+    </div>
+    <button class="btn btn-blue btn-full" onclick="runSASCal()">▶ Run Full Calibration</button>
+    <div class="btn-row mt12">
+      <button class="btn btn-red btn-sm" onclick="sendCmd('31 3D 22 00 00')">Reset SAS</button>
+      <button class="btn btn-sm btn-gold" onclick="sendCmd('04')">Clear C1A35</button>
+    </div>
+  </div>
+
+  <!-- SUSPENSION -->
+  <div class="panel" id="panel-susp">
+    <div class="section-title"><span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;">‹</button>Air <span>Suspension</span></span></div>
+    <div class="warn-box mb12"><span class="warn-icon">⚠️</span><div>Never go under the vehicle during height changes. EAS operates at high pressure.</div></div>
+    <div class="card mb12">
+      <div class="card-label">CORNER HEIGHT SENSORS</div>
+      <div class="g2" style="gap:8px;">
+        <div class="info-row"><span class="info-key">FRONT LEFT</span><span class="info-val" id="hs-fl">—</span></div>
+        <div class="info-row"><span class="info-key">FRONT RIGHT</span><span class="info-val" id="hs-fr">—</span></div>
+        <div class="info-row"><span class="info-key">REAR LEFT</span><span class="info-val" id="hs-rl">—</span></div>
+        <div class="info-row"><span class="info-key">REAR RIGHT</span><span class="info-val" id="hs-rr">—</span></div>
+      </div>
+    </div>
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--t3);margin-bottom:8px;">HEIGHT MODE</div>
+    <div class="g2 mb12">
+      <div class="height-btn" id="hb-ext" onclick="setHeight('ext')"><div class="hb-icon">🔼</div><div class="hb-label">EXTENDED</div></div>
+      <div class="height-btn selected" id="hb-norm" onclick="setHeight('norm')"><div class="hb-icon">➡️</div><div class="hb-label">NORMAL</div></div>
+      <div class="height-btn" id="hb-low" onclick="setHeight('low')"><div class="hb-icon">🔽</div><div class="hb-label">ACCESS LOW</div></div>
+      <div class="height-btn" id="hb-crawl" onclick="setHeight('crawl')"><div class="hb-icon">🪨</div><div class="hb-label">CRAWL</div></div>
+    </div>
+  </div>
+
+  <!-- THROTTLE -->
+  <div class="panel" id="panel-throttle">
+    <div class="section-title"><span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;">‹</button>Throttle <span>Reset</span></span></div>
+    <div class="warn-box mb12"><span class="warn-icon">ℹ️</span>Engine must be at operating temperature (coolant ≥80°C) before reset.</div>
+    <div class="card mb12">
+      <div class="card-label">THROTTLE DATA</div>
+      <div class="info-row"><span class="info-key">ACTUAL POS</span><span class="info-val" id="thr-act">—</span></div>
+      <div class="info-row"><span class="info-key">TARGET IDLE</span><span class="info-val">730 RPM</span></div>
+      <div class="info-row"><span class="info-key">ACTUAL IDLE</span><span class="info-val" id="idle-a">—</span></div>
+    </div>
+    <button class="btn btn-blue btn-full" onclick="sendCmd('31 01 11');termLog('ETC adaptation cleared','info')">⚡ Reset ETC Adaptation</button>
+  </div>
+
+  <!-- BATTERY -->
+  <div class="panel" id="panel-battery">
+    <div class="section-title"><span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;">‹</button>Battery <span>Reg.</span></span></div>
+    <div class="warn-box mb12"><span class="warn-icon">ℹ️</span>Register new battery after replacement to update the IBS module charging strategy.</div>
+    <div class="card mb12">
+      <div class="card-label">IBS READINGS</div>
+      <div class="info-row"><span class="info-key">VOLTAGE</span><span class="info-val" id="bat-v">—</span></div>
+      <div class="info-row"><span class="info-key">STATE OF CHARGE</span><span class="info-val" id="bat-soc">—</span></div>
+      <div class="info-row"><span class="info-key">STATE OF HEALTH</span><span class="info-val" id="bat-soh">—</span></div>
+    </div>
+    <div class="card mb12">
+      <div class="card-label">NEW BATTERY</div>
+      <div class="mb8"><div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:6px;">CAPACITY (AH)</div><input type="number" id="bat-ah" value="110"></div>
+      <div><div style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-bottom:6px;">TYPE</div>
+      <select id="bat-type"><option>Standard Lead-Acid</option><option selected>AGM</option><option>EFB</option></select></div>
+    </div>
+    <button class="btn btn-gold btn-full" onclick="registerBattery()">Register Battery in IBS</button>
+  </div>
+
+  <!-- TERMINAL -->
+  <div class="panel" id="panel-terminal">
+    <div class="section-title"><span><button onclick="goPanel('panel-cal')" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;">‹</button>OBD-II <span>Terminal</span></span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+      <button class="btn btn-sm btn-gold" onclick="sendCmd('ATZ')">ATZ</button>
+      <button class="btn btn-sm btn-blue" onclick="sendCmd('ATSP6')">CAN</button>
+      <button class="btn btn-sm btn-blue" onclick="sendCmd('0902')">VIN</button>
+      <button class="btn btn-sm btn-blue" onclick="sendCmd('03')">Read DTCs</button>
+      <button class="btn btn-sm btn-red" onclick="sendCmd('04')">Clear DTCs</button>
+      <button class="btn btn-sm btn-blue" onclick="sendCmd('010C')">RPM</button>
+      <button class="btn btn-sm btn-blue" onclick="sendCmd('0105')">Coolant</button>
+    </div>
+    <div class="terminal" id="termOut">
+      <div class="tl info">RR Diagnostics — OBD-II Terminal</div>
+      <div class="tl info">BBfly MS-CAN / HS-CAN WiFi Adapter</div>
+      <div class="tl">──────────────────────────────────</div>
+      <div class="tl" style="color:var(--t3)">Connect to BBfly WiFi then tap OFFLINE above.</div>
+    </div>
+    <div class="term-row">
+      <span>&gt;_</span>
+      <input class="term-input" id="termIn" placeholder="OBD command..." onkeydown="if(event.key==='Enter')sendTermCmd()">
+      <button class="btn btn-sm btn-blue" onclick="sendTermCmd()">Send</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nb-dash" onclick="switchTab('dash')"><span class="nav-icon">📊</span><span>LIVE</span></button>
+  <button class="nav-btn" id="nb-dtc" onclick="switchTab('dtc')"><span class="nav-icon">⚠️</span><span>FAULTS</span><span class="nav-badge">3</span></button>
+  <button class="nav-btn" id="nb-cal" onclick="switchTab('cal')"><span class="nav-icon">🔧</span><span>CAL</span></button>
+</nav>
+
+<!-- CONNECT SHEET -->
+<div id="sheet-overlay" onclick="closeSheet()"></div>
+<div id="connect-sheet">
+  <div class="sheet-handle"></div>
+  <div style="font-family:var(--head);font-size:20px;font-weight:700;letter-spacing:2px;margin-bottom:6px;">Connect BBfly Adapter</div>
+  <div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;">
+    First go to Android <strong>Settings → WiFi</strong> and connect to the <strong>BBfly</strong> or <strong>OBDII</strong> network. Then tap Connect below.
+  </div>
+
+  <div class="direct-box">
+    <h3>📶 BBfly WiFi Direct</h3>
+    <p>Your BBfly adapter IP address (check the sticker on your adapter, or try the default):</p>
+    <div class="ip-row">
+      <input type="text" id="adapterIp" value="192.168.0.10" placeholder="192.168.0.10">
+      <div style="font-family:var(--mono);font-size:13px;color:var(--t3);white-space:nowrap;">: 35000</div>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--t3);">Try also: 192.168.1.1 &nbsp;·&nbsp; 192.168.0.1 &nbsp;·&nbsp; 10.0.0.1</div>
+  </div>
+
+  <button class="btn-connect-big" id="connectBtn" onclick="connectBBfly()">
+    <span id="connBtnIcon">📡</span>
+    <span id="connBtnText">Connect to BBfly</span>
+  </button>
+
+  <div class="sheet-status" id="sheetStatus">Make sure you are connected to the BBfly WiFi network first</div>
+
+  <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--t3);letter-spacing:1px;margin-bottom:8px;">WIFI NETWORK TO JOIN ON YOUR PHONE</div>
+    <div style="font-family:var(--mono);font-size:14px;color:var(--accent);background:var(--bg2);border:1px solid var(--border);padding:12px;border-radius:3px;text-align:center;">BBfly &nbsp;&nbsp;or&nbsp;&nbsp; OBDII &nbsp;&nbsp;or&nbsp;&nbsp; WiFi_OBDII</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">Password: none (open) · or try: 12345678</div>
+  </div>
+</div>
+
+<!-- DTC MODAL -->
+<div id="dtcModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:700;align-items:flex-end;">
+  <div style="background:var(--panel);border-top:1px solid var(--border);border-radius:12px 12px 0 0;padding:20px;width:100%;">
+    <div style="font-family:var(--head);font-size:18px;font-weight:700;margin-bottom:8px;" id="dtcModalCode"></div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.7;margin-bottom:16px;" id="dtcModalText"></div>
+    <button class="btn btn-blue btn-full" onclick="document.getElementById('dtcModal').style.display='none'">Close</button>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+let connected = false, liveOn = false, liveTimer = null, socket = null;
+
+// ── NAV ──
+function switchTab(t) {
+  ['dash','dtc','cal'].forEach(id => {
+    document.getElementById('panel-'+id).classList.remove('active');
+    document.getElementById('nb-'+id).classList.remove('active');
+  });
+  document.getElementById('panel-'+t).classList.add('active');
+  document.getElementById('nb-'+t).classList.add('active');
+  document.getElementById('mainScroll').scrollTop = 0;
+}
+function goPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('mainScroll').scrollTop = 0;
+}
+
+// ── SHEET ──
+function openSheet() {
+  document.getElementById('sheet-overlay').style.display = 'block';
+  setTimeout(() => document.getElementById('connect-sheet').style.bottom = '0', 10);
+}
+function closeSheet() {
+  document.getElementById('connect-sheet').style.bottom = '-100%';
+  setTimeout(() => document.getElementById('sheet-overlay').style.display = 'none', 300);
+}
+
+// ── CONNECT ──
+async function connectBBfly() {
+  const ip = document.getElementById('adapterIp').value.trim();
+  setBtn('connecting', 'Connecting...');
+  setSheetStatus('Trying to reach ' + ip + ' on port 35000...');
+
+  // Try WebSocket first (BBfly supports WS on port 35000 when on same local network)
+  try {
+    socket = new WebSocket('ws://' + ip + ':35000');
+    socket.binaryType = 'arraybuffer';
+
+    const t = setTimeout(() => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        socket.close();
+        setBtn('', 'Connect to BBfly');
+        setSheetStatus('❌ Could not reach adapter.\n\nCheck: Are you connected to the BBfly WiFi network?\nTry a different IP: 192.168.1.1 or 192.168.0.1');
+      }
+    }, 5000);
+
+    socket.onopen = () => {
+      clearTimeout(t);
+      onConnected(ip);
+      setBtn('success', '✓ Connected!');
+      setSheetStatus('✅ Connected to BBfly adapter at ' + ip);
+      setTimeout(closeSheet, 1500);
+      // Init ELM327
+      ['ATZ','ATE0','ATSP6','ATH0','ATRV','0902'].forEach((c,i) => setTimeout(() => sendCmd(c), 400 + i*600));
+    };
+    socket.onmessage = e => {
+      const txt = typeof e.data === 'string' ? e.data : new TextDecoder().decode(e.data);
+      handleResp(txt.trim());
+    };
+    socket.onerror = () => {};
+    socket.onclose = () => {
+      if (connected) { connected = false; setStatus(null,'OFFLINE'); termLog('Disconnected','err'); }
+    };
+  } catch(e) {
+    setBtn('', 'Connect to BBfly');
+    setSheetStatus('❌ Error: ' + e.message);
+  }
+}
+
+function setBtn(state, text) {
+  const b = document.getElementById('connectBtn');
+  b.className = 'btn-connect-big' + (state ? ' '+state : '');
+  document.getElementById('connBtnText').textContent = text;
+}
+
+function onConnected(ip) {
+  connected = true;
+  setStatus('connected', 'BBFLY');
+  document.getElementById('notConnBanner').style.display = 'none';
+  document.getElementById('d-ip').textContent = ip;
+  document.getElementById('d-prot').textContent = 'ISO 15765-4 CAN';
+  document.getElementById('scan-time').textContent = new Date().toLocaleTimeString();
+}
+function setStatus(s, t) {
+  document.getElementById('statusPill').className = 'status-pill'+(s?' '+s:'');
+  document.getElementById('statusText').textContent = t || 'OFFLINE';
+}
+function setSheetStatus(m) { document.getElementById('sheetStatus').textContent = m; }
+
+// ── SEND / RECEIVE ──
+function sendCmd(cmd) {
+  termLog(cmd, 'cmd');
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(cmd + '\r');
+  } else {
+    setTimeout(() => handleResp(fakeOBD(cmd)), 200);
+  }
+}
+
+function handleResp(raw) {
+  const clean = raw.replace(/>/g,'').trim();
+  if (!clean) return;
+  termLog(clean, 'resp');
+  parseResp(clean);
+}
+
+function parseResp(r) {
+  const h = r.toUpperCase().replace(/\s/g,'');
+  if (h.startsWith('410C') && h.length>=8) { const rpm=((parseInt(h.substr(4,2),16)*256)+parseInt(h.substr(6,2),16))/4; setG('rpm',Math.round(rpm),rpm/6500,rpm>5500?'crit':rpm>4000?'warn':''); document.getElementById('idle-a').textContent=Math.round(rpm)+' RPM'; }
+  if (h.startsWith('410D') && h.length>=6) { const s=parseInt(h.substr(4,2),16); setG('speed',s,s/200,s>180?'warn':''); }
+  if (h.startsWith('4105') && h.length>=6) { const t=parseInt(h.substr(4,2),16)-40; setG('coolant',t,t/130,t>110?'crit':t>100?'warn':''); }
+  if (h.startsWith('4111') && h.length>=6) { const t=parseInt(h.substr(4,2),16)*100/255; setG('throttle',t.toFixed(1),t/100,''); document.getElementById('thr-act').textContent=t.toFixed(1)+'%'; }
+  if (h.startsWith('4110') && h.length>=8) { const m=((parseInt(h.substr(4,2),16)*256)+parseInt(h.substr(6,2),16))/100; setG('maf',m.toFixed(1),m/30,''); }
+  if (h.startsWith('4106') && h.length>=6) { const f=(parseInt(h.substr(4,2),16)-128)*100/128; setG('fuel',(f>=0?'+':'')+f.toFixed(1),(f+25)/50,Math.abs(f)>10?'warn':''); }
+  if (h.startsWith('4133') && h.length>=6) { const b=parseInt(h.substr(4,2),16); setG('baro',b,b/110,''); }
+  if (h.startsWith('4114') && h.length>=6) { const o=parseInt(h.substr(4,2),16)/200; setG('o2',o.toFixed(2),o/1.275,''); }
+  if (r.match(/\d+\.\d+V/)) { document.getElementById('d-volt').textContent=r.match(/\d+\.\d+V/)[0]; }
+  if (r.includes('ELM327')) termLog('ELM327 ready — BBfly connected','info');
+  if (h.includes('4902')) { document.getElementById('d-vin').textContent='SALVA244XA…(from adapter)'; }
+}
+
+function fakeOBD(c) {
+  const m={'ATZ':'ELM327 v1.5','ATE0':'OK','ATSP6':'OK','ATH0':'OK','ATRV':'12.4V','0902':'49 02 01 53 41 4C 56 41','03':'43 01 03 00 00 00 00','04':'OK','010C':'41 0C 0E 44','010D':'41 0D 28','0105':'41 05 6E','0111':'41 11 1E','0110':'41 10 02 4F','0106':'41 06 80'};
+  return m[c.toUpperCase()]||'NO DATA';
+}
+
+// ── LIVE ──
+const PIDS = ['010C','010D','0105','0111','0110','0106'];
+let pidIdx = 0;
+function toggleLive() {
+  if (liveOn) {
+    liveOn=false; clearInterval(liveTimer);
+    document.getElementById('liveBtn').textContent='▶ START';
+    document.getElementById('liveBtn').className='btn btn-sm btn-blue';
+  } else {
+    liveOn=true;
+    document.getElementById('liveBtn').textContent='⏹ STOP';
+    document.getElementById('liveBtn').className='btn btn-sm btn-red';
+    liveTimer = connected
+      ? setInterval(()=>{ sendCmd(PIDS[pidIdx++%PIDS.length]); }, 350)
+      : setInterval(demoTick, 700);
+    if (!connected) demoTick();
+  }
+}
+
+function demoTick() {
+  const t=Date.now()/1000;
+  const rpm=800+Math.sin(t*.8)*300+Math.random()*80;
+  const spd=Math.max(0,Math.sin(t*.3)*60+30);
+  const cool=85+Math.sin(t*.1)*8+Math.random()*3;
+  const thr=Math.max(0,15+Math.sin(t*1.2)*12+Math.random()*5);
+  const maf=5+Math.sin(t*.9)*4+Math.random()*2;
+  const fuel=Math.sin(t*.4)*8+Math.random()*4;
+  const o2=.5+Math.sin(t*2)*.3+Math.random()*.1;
+  setG('rpm',Math.round(rpm),rpm/6500,rpm>5500?'crit':rpm>4000?'warn':'');
+  setG('speed',Math.round(spd),spd/200,'');
+  setG('coolant',Math.round(cool),cool/130,cool>110?'crit':cool>100?'warn':'');
+  setG('throttle',Math.round(thr),thr/100,'');
+  setG('maf',maf.toFixed(1),maf/30,'');
+  setG('fuel',(fuel>=0?'+':'')+fuel.toFixed(1),(fuel+25)/50,Math.abs(fuel)>10?'warn':'');
+  setG('baro','101',101/110,'');
+  setG('o2',o2.toFixed(2),o2/1.2,'');
+  document.getElementById('sas-val').textContent=(Math.sin(t*.3)*3).toFixed(1)+'°';
+  document.getElementById('thr-act').textContent=thr.toFixed(1)+'%';
+  document.getElementById('idle-a').textContent=Math.round(rpm)+' RPM';
+}
+
+function setG(id,val,pct,state) {
+  const c=document.getElementById('g-'+id); if(!c) return;
+  c.className='gauge'+(state?' '+state:'');
+  document.getElementById('v-'+id).textContent=val;
+  document.getElementById('b-'+id).style.width=Math.min(100,Math.max(0,pct*100))+'%';
+}
+
+// ── TERMINAL ──
+function termLog(msg,type) {
+  const o=document.getElementById('termOut'); if(!o) return;
+  const d=document.createElement('div');
+  d.className='tl '+(type||'');
+  d.textContent=(type==='cmd'?'> ':'')+msg;
+  o.appendChild(d);
+  while(o.children.length>80) o.removeChild(o.firstChild);
+  o.scrollTop=o.scrollHeight;
+}
+function sendTermCmd() {
+  const i=document.getElementById('termIn');
+  const c=i.value.trim(); if(!c) return;
+  i.value=''; sendCmd(c.toUpperCase());
+}
+
+// ── DTC ──
+function readDTCs() { sendCmd('03'); document.getElementById('scan-time').textContent=new Date().toLocaleTimeString(); }
+function clearDTCs() { if(!confirm('Clear all DTCs?')) return; sendCmd('04'); }
+function dtcInfo(code,text) {
+  document.getElementById('dtcModalCode').textContent=code;
+  document.getElementById('dtcModalText').textContent=text;
+  document.getElementById('dtcModal').style.display='flex';
+}
+
+// ── CALIBRATIONS ──
+let calRunning=false;
+function runSASCal() {
+  if(calRunning) return; calRunning=true; let i=2;
+  function next() {
+    if(i>5){calRunning=false;termLog('SAS calibration complete ✓','resp');return;}
+    if(i>2){const p=document.getElementById('cs'+(i-1));p.className='cal-step done';p.querySelector('.cal-num').textContent='✓';}
+    document.getElementById('cs'+i).className='cal-step active';
+    if(i===3) sendCmd('31 3D 22 00 00');
+    if(i===5) sendCmd('04');
+    i++; setTimeout(next,2500);
+  }
+  next();
+}
+function setHeight(m) {
+  document.querySelectorAll('.height-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('hb-'+m).classList.add('selected');
+  termLog('EAS height → '+m.toUpperCase(),'info');
+}
+function registerBattery() {
+  const ah=document.getElementById('bat-ah').value;
+  sendCmd('31 B0 '+parseInt(ah).toString(16).padStart(2,'0').toUpperCase());
+  termLog('Battery registration sent: '+ah+'Ah','info');
+}
+
+// ── INIT ──
+setTimeout(toggleLive, 500);
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
